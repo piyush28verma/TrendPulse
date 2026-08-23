@@ -13,7 +13,6 @@ from backend.models import TrendItem, RetrievedPassage, GeneratedContent
 
 # Initialize ChromaDB in-memory client
 chroma_client = chromadb.Client()
-
 _collection = None
 
 
@@ -152,7 +151,6 @@ Generate now:"""
 def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
     """
     Generate grounded content using Groq LLM with retrieved RAG passages.
-    Tries models in order: llama-3.3-70b-versatile, llama3-70b-8192, llama-3.1-70b-versatile, mixtral-8x7b-32768.
     """
     if not settings.GROQ_API_KEY:
         return GeneratedContent(
@@ -164,13 +162,12 @@ def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
     client = Groq(api_key=settings.GROQ_API_KEY)
     prompt = _build_rag_prompt(passages)
 
-    # List of candidate Groq models
+    # List of active Groq model IDs
     candidate_models = [
-        "llama-3.3-70b-versatile",
-        "llama3-70b-8192",
-        "llama-3.1-70b-versatile",
-        "mixtral-8x7b-32768",
-        "llama3-8b-8192"
+        "openai/gpt-oss-120b",
+        "groq/compound",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.6-27b",
     ]
 
     completion = None
@@ -194,7 +191,7 @@ def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
     if not completion:
         return GeneratedContent(
             title="[ERROR] Content generation failed",
-            body=f"Groq API error across all models: {last_error}",
+            body=f"Groq API error across candidate models: {last_error}",
             retrieved_passages=passages,
         )
 
