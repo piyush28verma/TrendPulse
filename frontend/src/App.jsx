@@ -228,7 +228,7 @@ function App() {
             </h2>
             {postResult?.success && (
               <span className="card-badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle2 size={12} /> Posted to Reddit
+                <CheckCircle2 size={12} /> Posted to LinkedIn
               </span>
             )}
           </div>

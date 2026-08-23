@@ -28,18 +28,12 @@ sse_clients: List[asyncio.Queue] = []
 
 
 def _broadcast_sse(event: str, data: dict):
-    """Send an SSE event to all connected clients."""
-    message = json.dumps(data)
+    message = json.dumps(data, default=str)
     for queue in sse_clients:
         try:
             queue.put_nowait({"event": event, "data": message})
         except asyncio.QueueFull:
             pass
-
-
-def run_pipeline_sync():
-    """Execute the full pipeline synchronously (used by scheduler)."""
-    asyncio.get_event_loop().run_until_complete(_run_pipeline_async())
 
 
 async def _run_pipeline_async():
@@ -52,7 +46,7 @@ async def _run_pipeline_async():
     try:
         # ── Step 1: Fetch Trends ─────────────────────────────────────────
         _broadcast_sse("pipeline_step", {"step": "fetch", "status": "running"})
-        await asyncio.sleep(0.1)  # Allow SSE to flush
+        await asyncio.sleep(0.1)
 
         trends, fetch_logs = await asyncio.to_thread(fetch_all_trends)
         result.trends = trends
@@ -82,7 +76,7 @@ async def _run_pipeline_async():
             pipeline_history.append(result.to_dict())
             return result
 
-        # ── Step 2: Ingest into ChromaDB ─────────────────────────────────
+        # ── Step 2 + 3: Ingest & Retrieve ────────────────────────────────
         _broadcast_sse("pipeline_step", {"step": "ingest", "status": "running"})
         await asyncio.sleep(0.1)
 
@@ -134,7 +128,6 @@ async def _run_pipeline_async():
         result.status = "completed"
         result.completed_at = datetime.utcnow().isoformat()
 
-        # Broadcast final result
         _broadcast_sse("pipeline_complete", result.to_dict())
 
     except Exception as e:
@@ -149,8 +142,7 @@ async def _run_pipeline_async():
 # ── App Lifecycle ────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start scheduler on startup, shutdown on exit."""
-    set_pipeline_callback(run_pipeline_sync)
+    set_pipeline_callback(_run_pipeline_async)
     start_scheduler()
     yield
     shutdown_scheduler()
@@ -164,7 +156,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow React dev server
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
@@ -179,7 +170,6 @@ app.add_middleware(
 
 @app.get("/api/health")
 async def health():
-    """Health check + credential status."""
     return {
         "status": "ok",
         "credentials": settings.validate(),
@@ -189,14 +179,12 @@ async def health():
 
 @app.post("/api/pipeline/run")
 async def trigger_pipeline():
-    """Trigger the full RAG pipeline manually (Run Now button)."""
     result = await _run_pipeline_async()
     return result.to_dict() if result else {"status": "error"}
 
 
 @app.get("/api/pipeline/stream")
 async def pipeline_stream(request: Request):
-    """SSE endpoint for real-time pipeline step events."""
     queue = asyncio.Queue(maxsize=100)
     sse_clients.append(queue)
 
@@ -211,14 +199,14 @@ async def pipeline_stream(request: Request):
                 except asyncio.TimeoutError:
                     yield {"event": "heartbeat", "data": json.dumps({"time": datetime.utcnow().isoformat()})}
         finally:
-            sse_clients.remove(queue)
+            if queue in sse_clients:
+                sse_clients.remove(queue)
 
     return EventSourceResponse(event_generator())
 
 
 @app.get("/api/trends")
 async def get_trends():
-    """Return the most recent pipeline's trends."""
     if pipeline_history:
         latest = pipeline_history[-1]
         return {"trends": latest.get("trends", []), "count": latest.get("trends_count", 0)}
@@ -227,7 +215,6 @@ async def get_trends():
 
 @app.get("/api/posts")
 async def get_posts():
-    """Return post history with Reddit URLs and citations."""
     posts = []
     for run in pipeline_history:
         if run.get("post_result"):
@@ -241,19 +228,16 @@ async def get_posts():
 
 @app.get("/api/swytchcode/log")
 async def get_swytchcode_log():
-    """Return the complete Swytchcode audit log."""
     return {"log": swytchcode_audit_log, "count": len(swytchcode_audit_log)}
 
 
 @app.get("/api/scheduler/status")
 async def scheduler_status():
-    """Get scheduler status including next run time."""
     return get_scheduler_status()
 
 
 @app.get("/api/pipeline/history")
 async def get_pipeline_history():
-    """Return all pipeline run history."""
     return {"runs": pipeline_history, "count": len(pipeline_history)}
 
 
@@ -265,7 +249,6 @@ if os.path.exists(frontend_build):
 
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        """Serve React SPA for all non-API routes."""
         file_path = os.path.join(frontend_build, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)

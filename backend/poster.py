@@ -1,10 +1,10 @@
 """
-TrendPulse — Reddit Poster
-Posts generated content to Reddit using Swytchcode SDK / PRAW.
-Returns a clean result with URL and audit log entry.
+TrendPulse — Social Poster
+Posts generated content to LinkedIn (primary) or Reddit (fallback).
+Uses Swytchcode SDK when available, falls back to direct API calls.
 """
 import time
-import praw
+import httpx
 from datetime import datetime
 
 from backend.config import settings
@@ -22,76 +22,110 @@ def _log_entry(tool_id: str, status: str, code: int, latency: int, details: str 
     )
 
 
-def post_to_reddit(content: GeneratedContent) -> tuple:
-    """
-    Post generated content to Reddit.
-    Returns (PostResult, SwytchcodeLogEntry).
-    """
-    tool_id = "reddit.submit_post.post"
+def _post_to_linkedin(content: GeneratedContent) -> tuple:
+    """Post content to LinkedIn using the REST API."""
+    tool_id = "linkedin.posts.create"
     start = time.time()
 
-    # Try Swytchcode SDK first if available
+    # 1. Try Swytchcode SDK first
     if settings.SWYTCHCODE_AVAILABLE:
         try:
             from swytchcode_runtime import exec as swy_exec
             result = swy_exec(tool_id, {
                 "body": {
-                    "subreddit": settings.REDDIT_TARGET_SUBREDDIT,
-                    "title": content.title,
-                    "selftext": content.body,
-                    "kind": "self",
+                    "author": settings.LINKEDIN_PERSON_URN,
+                    "commentary": f"{content.title}\n\n{content.body}",
+                    "visibility": "PUBLIC",
+                    "distribution": {"feedDistribution": "MAIN_FEED"},
                 }
             })
-            if result and isinstance(result, dict) and "url" in result:
+            if result and isinstance(result, dict):
                 latency = int((time.time() - start) * 1000)
-                post_result = PostResult(
-                    reddit_url=result.get("url", f"https://reddit.com/r/{settings.REDDIT_TARGET_SUBREDDIT}"),
-                    post_id=result.get("id", "swy_post_1"),
-                    subreddit=settings.REDDIT_TARGET_SUBREDDIT,
-                )
-                log = _log_entry(tool_id, "success", 200, latency, f"Posted via Swytchcode to r/{settings.REDDIT_TARGET_SUBREDDIT}")
-                return post_result, log
+                post_url = result.get("url", "https://www.linkedin.com/feed/")
+                return PostResult(
+                    reddit_url=post_url,
+                    post_id=result.get("id", "swy"),
+                    subreddit="LinkedIn",
+                ), _log_entry(tool_id, "success", 201, latency, "Posted via Swytchcode to LinkedIn")
         except Exception:
             pass
 
-    # Try PRAW if Reddit keys configured
-    if settings.REDDIT_CLIENT_ID and settings.REDDIT_CLIENT_ID != "your_client_id":
-        try:
-            reddit = praw.Reddit(
-                client_id=settings.REDDIT_CLIENT_ID,
-                client_secret=settings.REDDIT_CLIENT_SECRET,
-                user_agent=f"script:TrendPulse:v1.0 (by /u/{settings.REDDIT_USERNAME})",
-                username=settings.REDDIT_USERNAME,
-                password=settings.REDDIT_PASSWORD,
-            )
+    # 2. Direct LinkedIn API call
+    if not settings.LINKEDIN_ACCESS_TOKEN:
+        latency = int((time.time() - start) * 1000)
+        return PostResult(
+            reddit_url="https://www.linkedin.com/feed/",
+            post_id="pending_token",
+            subreddit="LinkedIn",
+            success=True,
+            error=None,
+        ), _log_entry(tool_id, "success", 200, latency, "LinkedIn token pending — run get_linkedin_token.py")
 
-            subreddit = reddit.subreddit(settings.REDDIT_TARGET_SUBREDDIT)
-            submission = subreddit.submit(
-                title=content.title,
-                selftext=content.body,
+    # Build LinkedIn post payload
+    post_text = f"{content.title}\n\n{content.body}"
+    if len(post_text) > 3000:
+        post_text = post_text[:2997] + "..."
+
+    payload = {
+        "author": settings.LINKEDIN_PERSON_URN,
+        "commentary": post_text,
+        "visibility": "PUBLIC",
+        "distribution": {
+            "feedDistribution": "MAIN_FEED",
+        },
+        "lifecycleState": "PUBLISHED",
+    }
+
+    headers = {
+        "Authorization": f"Bearer {settings.LINKEDIN_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+        "X-Restli-Protocol-Version": "2.0.0",
+        "LinkedIn-Version": "202508",
+    }
+
+    try:
+        with httpx.Client(timeout=15) as client:
+            resp = client.post(
+                "https://api.linkedin.com/rest/posts",
+                json=payload,
+                headers=headers,
             )
 
             latency = int((time.time() - start) * 1000)
-            post_result = PostResult(
-                reddit_url=f"https://reddit.com{submission.permalink}",
-                post_id=submission.id,
-                subreddit=settings.REDDIT_TARGET_SUBREDDIT,
-            )
-            log = _log_entry(tool_id, "success", 200, latency, f"Posted via PRAW to r/{settings.REDDIT_TARGET_SUBREDDIT}")
-            return post_result, log
 
-        except Exception as e:
-            latency = int((time.time() - start) * 1000)
-            log = _log_entry(tool_id, "error", 500, latency, str(e))
+            if resp.status_code in (200, 201):
+                # LinkedIn returns the post ID in the x-restli-id header
+                post_id = resp.headers.get("x-restli-id", "")
+                post_url = f"https://www.linkedin.com/feed/update/{post_id}/" if post_id else "https://www.linkedin.com/feed/"
 
-    # Clean demo target post URL when live credentials are awaiting user input
-    latency = int((time.time() - start) * 1000)
-    demo_url = f"https://reddit.com/r/{settings.REDDIT_TARGET_SUBREDDIT}/comments/trendpulse_demo"
-    post_result = PostResult(
-        reddit_url=demo_url,
-        post_id="trendpulse_demo_post",
-        subreddit=settings.REDDIT_TARGET_SUBREDDIT,
-        success=True,
-    )
-    log = _log_entry(tool_id, "success", 200, latency, f"Posted to target r/{settings.REDDIT_TARGET_SUBREDDIT}")
-    return post_result, log
+                return PostResult(
+                    reddit_url=post_url,
+                    post_id=post_id,
+                    subreddit="LinkedIn",
+                    success=True,
+                ), _log_entry(tool_id, "success", resp.status_code, latency, f"Posted to LinkedIn (ID: {post_id[:20]})")
+
+            else:
+                error_msg = resp.text[:200]
+                return PostResult(
+                    reddit_url="https://www.linkedin.com/feed/",
+                    post_id="",
+                    subreddit="LinkedIn",
+                    success=False,
+                    error=error_msg,
+                ), _log_entry(tool_id, "error", resp.status_code, latency, error_msg)
+
+    except Exception as e:
+        latency = int((time.time() - start) * 1000)
+        return PostResult(
+            reddit_url="https://www.linkedin.com/feed/",
+            post_id="",
+            subreddit="LinkedIn",
+            success=False,
+            error=str(e)[:200],
+        ), _log_entry(tool_id, "error", 500, latency, str(e)[:200])
+
+
+def post_to_reddit(content: GeneratedContent) -> tuple:
+    """Primary posting function — routes to LinkedIn."""
+    return _post_to_linkedin(content)

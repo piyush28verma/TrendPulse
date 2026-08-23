@@ -1,8 +1,8 @@
 """
 TrendPulse — RAG Engine
 ChromaDB vector store + SentenceTransformer embeddings + Groq LLM generation.
-This is the core RAG pipeline: Ingest → Embed → Retrieve → Generate.
 """
+import re
 import chromadb
 from groq import Groq
 from typing import List
@@ -11,13 +11,11 @@ from backend.config import settings
 from backend.models import TrendItem, RetrievedPassage, GeneratedContent
 
 
-# Initialize ChromaDB in-memory client
 chroma_client = chromadb.Client()
 _collection = None
 
 
 def _get_collection():
-    """Get or create the trends collection with SentenceTransformer embeddings."""
     global _collection
     if _collection is None:
         try:
@@ -39,10 +37,6 @@ def _get_collection():
 
 
 def ingest_trends(trends: List[TrendItem]) -> int:
-    """
-    Ingest trend documents into ChromaDB vector store.
-    Each trend is chunked, embedded, and indexed with source metadata.
-    """
     collection = _get_collection()
 
     existing = collection.get()
@@ -61,23 +55,15 @@ def ingest_trends(trends: List[TrendItem]) -> int:
         if doc_text.strip():
             documents.append(doc_text)
             metadatas.append(trend.to_metadata())
-            ids.append(f"trend_{i}_{trend.source.replace(' ', '_').lower()}")
+            ids.append(f"trend_{i}_{trend.source.replace(' ', '_').replace('/', '_').lower()}")
 
     if documents:
-        collection.add(
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids,
-        )
+        collection.add(documents=documents, metadatas=metadatas, ids=ids)
 
     return len(documents)
 
 
 def retrieve_relevant(query: str = "current trending topics in technology", top_k: int = 5) -> List[RetrievedPassage]:
-    """
-    Retrieve the top-K most relevant trend passages from ChromaDB
-    using cosine similarity vector search.
-    """
     collection = _get_collection()
 
     count = collection.count()
@@ -96,7 +82,6 @@ def retrieve_relevant(query: str = "current trending topics in technology", top_
     for i in range(len(results["documents"][0])):
         distance = results["distances"][0][i]
         similarity = 1.0 - (distance / 2.0)
-
         metadata = results["metadatas"][0][i]
         passages.append(RetrievedPassage(
             text=results["documents"][0][i],
@@ -104,7 +89,7 @@ def retrieve_relevant(query: str = "current trending topics in technology", top_
             source_type=metadata.get("source_type", "unknown"),
             url=metadata.get("url", ""),
             title=metadata.get("title", ""),
-            similarity_score=similarity,
+            similarity_score=round(similarity, 4),
         ))
 
     passages.sort(key=lambda p: p.similarity_score, reverse=True)
@@ -112,66 +97,88 @@ def retrieve_relevant(query: str = "current trending topics in technology", top_
 
 
 def _build_rag_prompt(passages: List[RetrievedPassage]) -> str:
-    """Build the RAG-grounded prompt with retrieved context."""
     context_lines = []
     for i, p in enumerate(passages):
-        source_badge = {
-            "news": "News",
-            "social_chatter": "Social Chatter",
-            "emerging_topic": "Emerging Topic",
-        }.get(p.source_type, "Other")
-
+        source_badge = {"news": "News", "social_chatter": "Social", "emerging_topic": "Emerging"}.get(p.source_type, "Other")
         context_lines.append(
-            f"[{i + 1}] SOURCE: {p.source} | TYPE: {source_badge}\n"
-            f"    TITLE: {p.title}\n"
-            f"    CONTENT: {p.text}\n"
+            f"[{i + 1}] ({source_badge}) {p.source}\n"
+            f"    Title: {p.title}\n"
+            f"    Content: {p.text[:400]}\n"
             f"    URL: {p.url}"
         )
-
     context_block = "\n\n".join(context_lines)
 
-    return f"""You are TrendPulse, an AI content engine. Generate ONE Reddit post STRICTLY grounded in the retrieved trend documents below. Never invent facts, statistics, or claims not present in the sources.
+    return f"""You are TrendPulse, an AI trend summarizer. Write ONE Reddit post grounded ONLY in the sources below. Never invent facts. Do NOT include any thinking, reasoning, or chain-of-thought. Output ONLY the formatted post.
 
-RETRIEVED TREND CONTEXT (Top-{len(passages)} by vector similarity):
----
+SOURCES:
 {context_block}
----
 
-TASK: Write a Reddit post for r/test that summarizes today's top trending topics.
+Write a Reddit post summarizing today's top tech trends. Use this EXACT format:
 
-FORMAT YOUR RESPONSE EXACTLY AS:
-TITLE: [One clear, engaging title — max 300 chars]
-BODY: [3-4 paragraphs grounded in above sources. Reference sources as [1], [2], etc.]
-SOURCES: [List which source numbers you used, e.g. 1, 2, 3]
-HASHTAGS: [3 relevant hashtags]
+TITLE: <your title here>
+BODY: <3-4 paragraphs referencing sources as [1], [2] etc.>
+SOURCES: <comma separated source numbers used, e.g. 1, 2, 3>
+HASHTAGS: <3 hashtags>"""
 
-Generate now:"""
+
+def _strip_thinking_tags(text: str) -> str:
+    """Remove <think>...</think> tags from model output (Qwen produces these)."""
+    # Complete tags
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Unclosed tag — strip from <think> to right before TITLE:/BODY: keywords
+    cleaned = re.sub(r'<think>.*?(?=TITLE:|BODY:|$)', '', cleaned, flags=re.DOTALL)
+    return cleaned.strip()
 
 
 def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
-    """
-    Generate grounded content using Groq LLM with retrieved RAG passages.
-    """
-    if not settings.GROQ_API_KEY:
+    if not passages:
+        return GeneratedContent(
+            title="No trend data available",
+            body="The pipeline fetched trends but no passages were retrieved from ChromaDB. Try running again.",
+            retrieved_passages=[],
+            model="none",
+        )
+
+    if not settings.GROQ_API_KEY or settings.GROQ_API_KEY.startswith("your_"):
         return GeneratedContent(
             title="[ERROR] Groq API key not configured",
-            body="Please set GROQ_API_KEY in your .env file.",
+            body="Set GROQ_API_KEY in .env",
             retrieved_passages=passages,
         )
 
     client = Groq(api_key=settings.GROQ_API_KEY)
     prompt = _build_rag_prompt(passages)
 
-    # List of active Groq model IDs
-    candidate_models = [
-        "openai/gpt-oss-120b",
+    # Preferred model order — compound gives best results
+    preferred_models = [
         "groq/compound",
-        "openai/gpt-oss-20b",
         "qwen/qwen3.6-27b",
+        "openai/gpt-oss-120b",
+        "groq/compound-mini",
+        "openai/gpt-oss-20b",
     ]
 
+    # Also query available models in case our list is stale
+    try:
+        models_resp = client.models.list()
+        available_ids = set()
+        for m in models_resp.data:
+            mid = m.id
+            if any(skip in mid for skip in ["whisper", "guard", "orpheus", "safeguard", "allam"]):
+                continue
+            available_ids.add(mid)
+
+        # Use preferred order but only include models that are actually available
+        candidate_models = [m for m in preferred_models if m in available_ids]
+        # Add any available models not in our preferred list
+        for mid in available_ids:
+            if mid not in candidate_models:
+                candidate_models.append(mid)
+    except Exception:
+        candidate_models = preferred_models
+
     completion = None
-    used_model = candidate_models[0]
+    used_model = "unknown"
     last_error = None
 
     for model_name in candidate_models:
@@ -180,46 +187,55 @@ def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=1024,
+                max_tokens=1500,
             )
-            used_model = model_name
-            break
+            response_text = completion.choices[0].message.content or ""
+
+            # Strip thinking tags and check if we got real content
+            response_text = _strip_thinking_tags(response_text)
+            if len(response_text.strip()) > 30:
+                used_model = model_name
+                break
+            else:
+                last_error = f"{model_name} returned too short response"
+                completion = None
+                continue
         except Exception as e:
-            last_error = str(e)
+            last_error = str(e)[:200]
+            completion = None
             continue
 
     if not completion:
         return GeneratedContent(
             title="[ERROR] Content generation failed",
-            body=f"Groq API error across candidate models: {last_error}",
+            body=f"All Groq models failed. Last error: {last_error}",
             retrieved_passages=passages,
+            model="error",
         )
 
-    response_text = completion.choices[0].message.content
+    response_text = _strip_thinking_tags(completion.choices[0].message.content or "")
 
-    # Parse the structured response
+    # Parse structured response
     title = ""
     body = ""
     citations = []
     hashtags = ""
-
-    lines = response_text.split("\n")
     current_section = None
 
-    for line in lines:
+    for line in response_text.split("\n"):
         stripped = line.strip()
-        if stripped.upper().startswith("TITLE:"):
+        up = stripped.upper()
+
+        if up.startswith("TITLE:"):
             current_section = "title"
             title = stripped[6:].strip()
-        elif stripped.upper().startswith("BODY:"):
+        elif up.startswith("BODY:"):
             current_section = "body"
             body = stripped[5:].strip()
-        elif stripped.upper().startswith("SOURCES:"):
+        elif up.startswith("SOURCES:"):
             current_section = "sources"
-            sources_str = stripped[8:].strip()
-            import re
-            citations = [int(x) for x in re.findall(r'\d+', sources_str)]
-        elif stripped.upper().startswith("HASHTAGS:") or stripped.upper().startswith("HASHTAG:"):
+            citations = [int(x) for x in re.findall(r'\d+', stripped)]
+        elif up.startswith("HASHTAG"):
             current_section = "hashtags"
             hashtags = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
         elif current_section == "body" and stripped:
@@ -230,7 +246,6 @@ def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
     body = body.strip()
     if hashtags:
         body += f"\n\n{hashtags}"
-
     if not title:
         title = "Today's Top Trending Topics in Technology"
     if not body:
@@ -247,9 +262,6 @@ def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
 
 
 def run_rag_pipeline(trends: List[TrendItem], query: str = "current trending topics in technology") -> tuple:
-    """
-    Full RAG pipeline: Ingest → Retrieve → Generate.
-    """
     vectors_indexed = ingest_trends(trends)
     passages = retrieve_relevant(query=query, top_k=5)
     content = generate_content(passages)

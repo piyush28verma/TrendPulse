@@ -14,8 +14,8 @@ function PipelineVisualizer({ steps, isRunning, onRun }) {
     { key: 'fetch',    Icon: Radio,   label: 'Fetch Trends',     sub: 'Swytchcode' },
     { key: 'ingest',   Icon: Layers,  label: 'Chunk & Embed',    sub: 'ChromaDB' },
     { key: 'retrieve', Icon: Search,  label: 'Vector Retrieve',  sub: 'Top-5 RAG' },
-    { key: 'generate', Icon: Cpu,     label: 'Groq Generate',    sub: 'Llama-3.3 70B' },
-    { key: 'post',     Icon: Share2,  label: 'Post to Reddit',   sub: 'Swytchcode' },
+    { key: 'generate', Icon: Cpu,     label: 'Groq Generate',    sub: 'Groq AI' },
+    { key: 'post',     Icon: Share2,  label: 'Post to LinkedIn',   sub: 'Swytchcode' },
   ];
 
   const getStepStatus = (key) => steps[key] || 'waiting';

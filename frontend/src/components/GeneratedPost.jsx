@@ -25,7 +25,7 @@ function GeneratedPost({ content, postResult }) {
               className="post-url"
               id="reddit-post-link"
             >
-              <ExternalLink size={14} /> View Live Post: {postResult.reddit_url}
+              <ExternalLink size={14} /> View on LinkedIn: {postResult.reddit_url}
             </a>
           ) : postResult?.error ? (
             <span style={{ fontSize: '13px', color: 'var(--accent-rose)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
