@@ -6,7 +6,6 @@ This is the core RAG pipeline: Ingest → Embed → Retrieve → Generate.
 import chromadb
 from groq import Groq
 from typing import List
-from datetime import datetime
 
 from backend.config import settings
 from backend.models import TrendItem, RetrievedPassage, GeneratedContent
@@ -15,7 +14,6 @@ from backend.models import TrendItem, RetrievedPassage, GeneratedContent
 # Initialize ChromaDB in-memory client
 chroma_client = chromadb.Client()
 
-# Global collection reference
 _collection = None
 
 
@@ -34,7 +32,6 @@ def _get_collection():
                 metadata={"hnsw:space": "cosine"},
             )
         except Exception:
-            # Fallback to default embedding if sentence-transformers not available
             _collection = chroma_client.get_or_create_collection(
                 name="trendpulse_trends",
                 metadata={"hnsw:space": "cosine"},
@@ -46,11 +43,9 @@ def ingest_trends(trends: List[TrendItem]) -> int:
     """
     Ingest trend documents into ChromaDB vector store.
     Each trend is chunked, embedded, and indexed with source metadata.
-    Returns count of vectors indexed.
     """
     collection = _get_collection()
 
-    # Clear existing data for fresh ingest
     existing = collection.get()
     if existing["ids"]:
         collection.delete(ids=existing["ids"])
@@ -100,8 +95,6 @@ def retrieve_relevant(query: str = "current trending topics in technology", top_
 
     passages = []
     for i in range(len(results["documents"][0])):
-        # ChromaDB cosine distance: 0 = identical, 2 = opposite
-        # Convert to similarity score: 1 - (distance / 2)
         distance = results["distances"][0][i]
         similarity = 1.0 - (distance / 2.0)
 
@@ -115,7 +108,6 @@ def retrieve_relevant(query: str = "current trending topics in technology", top_
             similarity_score=similarity,
         ))
 
-    # Sort by similarity descending
     passages.sort(key=lambda p: p.similarity_score, reverse=True)
     return passages
 
@@ -125,10 +117,10 @@ def _build_rag_prompt(passages: List[RetrievedPassage]) -> str:
     context_lines = []
     for i, p in enumerate(passages):
         source_badge = {
-            "news": "🗞 News",
-            "social_chatter": "💬 Social",
-            "emerging_topic": "🔥 Emerging",
-        }.get(p.source_type, "📄 Other")
+            "news": "News",
+            "social_chatter": "Social Chatter",
+            "emerging_topic": "Emerging Topic",
+        }.get(p.source_type, "Other")
 
         context_lines.append(
             f"[{i + 1}] SOURCE: {p.source} | TYPE: {source_badge}\n"
@@ -160,7 +152,7 @@ Generate now:"""
 def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
     """
     Generate grounded content using Groq LLM with retrieved RAG passages.
-    The LLM receives only the top-K passages as context, ensuring grounding.
+    Tries models in order: llama-3.3-70b-versatile, llama3-70b-8192, llama-3.1-70b-versatile, mixtral-8x7b-32768.
     """
     if not settings.GROQ_API_KEY:
         return GeneratedContent(
@@ -172,87 +164,96 @@ def generate_content(passages: List[RetrievedPassage]) -> GeneratedContent:
     client = Groq(api_key=settings.GROQ_API_KEY)
     prompt = _build_rag_prompt(passages)
 
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=1024,
-        )
+    # List of candidate Groq models
+    candidate_models = [
+        "llama-3.3-70b-versatile",
+        "llama3-70b-8192",
+        "llama-3.1-70b-versatile",
+        "mixtral-8x7b-32768",
+        "llama3-8b-8192"
+    ]
 
-        response_text = completion.choices[0].message.content
+    completion = None
+    used_model = candidate_models[0]
+    last_error = None
 
-        # Parse the structured response
-        title = ""
-        body = ""
-        citations = []
-        hashtags = ""
+    for model_name in candidate_models:
+        try:
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=1024,
+            )
+            used_model = model_name
+            break
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-        lines = response_text.split("\n")
-        current_section = None
-
-        for line in lines:
-            stripped = line.strip()
-            if stripped.upper().startswith("TITLE:"):
-                current_section = "title"
-                title = stripped[6:].strip()
-            elif stripped.upper().startswith("BODY:"):
-                current_section = "body"
-                body = stripped[5:].strip()
-            elif stripped.upper().startswith("SOURCES:"):
-                current_section = "sources"
-                sources_str = stripped[8:].strip()
-                # Extract citation numbers
-                import re
-                citations = [int(x) for x in re.findall(r'\d+', sources_str)]
-            elif stripped.upper().startswith("HASHTAGS:") or stripped.upper().startswith("HASHTAG:"):
-                current_section = "hashtags"
-                hashtags = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
-            elif current_section == "body" and stripped:
-                body += "\n" + stripped
-            elif current_section == "title" and stripped and not title:
-                title = stripped
-
-        # Clean up body and append hashtags
-        body = body.strip()
-        if hashtags:
-            body += f"\n\n{hashtags}"
-
-        # Fallback if parsing failed
-        if not title:
-            title = "Today's Top Trending Topics in Tech"
-        if not body:
-            body = response_text
-
-        return GeneratedContent(
-            title=title,
-            body=body,
-            citations=citations,
-            retrieval_scores=[p.similarity_score for p in passages],
-            retrieved_passages=passages,
-            model="llama-3.3-70b-versatile",
-        )
-
-    except Exception as e:
+    if not completion:
         return GeneratedContent(
             title="[ERROR] Content generation failed",
-            body=str(e),
+            body=f"Groq API error across all models: {last_error}",
             retrieved_passages=passages,
         )
+
+    response_text = completion.choices[0].message.content
+
+    # Parse the structured response
+    title = ""
+    body = ""
+    citations = []
+    hashtags = ""
+
+    lines = response_text.split("\n")
+    current_section = None
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.upper().startswith("TITLE:"):
+            current_section = "title"
+            title = stripped[6:].strip()
+        elif stripped.upper().startswith("BODY:"):
+            current_section = "body"
+            body = stripped[5:].strip()
+        elif stripped.upper().startswith("SOURCES:"):
+            current_section = "sources"
+            sources_str = stripped[8:].strip()
+            import re
+            citations = [int(x) for x in re.findall(r'\d+', sources_str)]
+        elif stripped.upper().startswith("HASHTAGS:") or stripped.upper().startswith("HASHTAG:"):
+            current_section = "hashtags"
+            hashtags = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
+        elif current_section == "body" and stripped:
+            body += "\n" + stripped
+        elif current_section == "title" and stripped and not title:
+            title = stripped
+
+    body = body.strip()
+    if hashtags:
+        body += f"\n\n{hashtags}"
+
+    if not title:
+        title = "Today's Top Trending Topics in Technology"
+    if not body:
+        body = response_text
+
+    return GeneratedContent(
+        title=title,
+        body=body,
+        citations=citations,
+        retrieval_scores=[p.similarity_score for p in passages],
+        retrieved_passages=passages,
+        model=used_model,
+    )
 
 
 def run_rag_pipeline(trends: List[TrendItem], query: str = "current trending topics in technology") -> tuple:
     """
     Full RAG pipeline: Ingest → Retrieve → Generate.
-    Returns (vectors_indexed, passages, generated_content).
     """
-    # Step 1: Ingest trends into ChromaDB
     vectors_indexed = ingest_trends(trends)
-
-    # Step 2: Retrieve top-K relevant passages
     passages = retrieve_relevant(query=query, top_k=5)
-
-    # Step 3: Generate grounded content
     content = generate_content(passages)
-
     return vectors_indexed, passages, content
