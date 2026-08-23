@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "tools": [
+    { "id": "newsapi.top_headlines.get", "description": "Fetch top tech/world news headlines" },
+    { "id": "reddit.hot_posts.get", "description": "Fetch hot Reddit posts (social chatter)" },
+    { "id": "hackernews.topstories.get", "description": "Fetch trending HackerNews stories" },
+    { "id": "devto.articles.get", "description": "Fetch trending developer articles from Dev.to" },
+    { "id": "googlenews.rss.get", "description": "Fetch trending headlines from Google News RSS" },
+    { "id": "reddit.submit_post.post", "description": "Post generated content to a subreddit" }
+  ]
+}
