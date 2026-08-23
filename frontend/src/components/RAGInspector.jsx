@@ -1,21 +1,22 @@
-/**
- * RAGInspector — Shows retrieved passages with cosine similarity bars.
- * This is the most impressive component for judges — proves RAG grounding.
- */
+import { Search, Globe, MessageSquare, Flame } from 'lucide-react';
+
 function RAGInspector({ passages }) {
   if (!passages || passages.length === 0) {
     return (
       <div className="empty-state">
-        <span className="icon">🔍</span>
-        <p className="message">Run the pipeline to see retrieved vector passages with similarity scores.</p>
+        <Search className="empty-state-icon" />
+        <p className="message">Run the pipeline to inspect vector passages retrieved from ChromaDB with similarity scores.</p>
       </div>
     );
   }
 
-  const sourceEmoji = {
-    news: '🗞',
-    social_chatter: '💬',
-    emerging_topic: '🔥',
+  const getSourceIcon = (type) => {
+    switch (type) {
+      case 'news': return <Globe size={14} style={{ color: 'var(--accent-sky)' }} />;
+      case 'social_chatter': return <MessageSquare size={14} style={{ color: 'var(--accent-rose)' }} />;
+      case 'emerging_topic': return <Flame size={14} style={{ color: 'var(--accent-amber)' }} />;
+      default: return <Search size={14} style={{ color: 'var(--accent-indigo)' }} />;
+    }
   };
 
   return (
@@ -29,7 +30,7 @@ function RAGInspector({ passages }) {
         >
           <div className="rag-passage-header">
             <span className="rag-passage-index">
-              [{i + 1}] {sourceEmoji[passage.source_type] || '📄'} {passage.source}
+              [{i + 1}] {getSourceIcon(passage.source_type)} {passage.source}
             </span>
             <div className="similarity-bar-container">
               <div className="similarity-bar">

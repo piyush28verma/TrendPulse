@@ -1,13 +1,11 @@
-/**
- * SwytchcodeLog — Live audit trail of all swy_exec() calls.
- * Shows tool IDs, status, latency, and policy enforcement.
- */
+import { CheckCircle2, XCircle, Lock } from 'lucide-react';
+
 function SwytchcodeLog({ log }) {
   if (!log || log.length === 0) {
     return (
       <div className="empty-state">
-        <span className="icon">🔒</span>
-        <p className="message">Swytchcode audit log will populate as API calls are executed.</p>
+        <Lock className="empty-state-icon" />
+        <p className="message">Swytchcode execution audit log will populate as tools are called by the pipeline.</p>
       </div>
     );
   }
@@ -27,9 +25,9 @@ function SwytchcodeLog({ log }) {
       <table className="log-table" id="swytchcode-log-table">
         <thead>
           <tr style={{ opacity: 1 }}>
-            <th>Time</th>
-            <th>Tool ID</th>
-            <th>Status</th>
+            <th>Timestamp</th>
+            <th>Canonical Tool ID</th>
+            <th>Execution Status</th>
             <th>Latency</th>
           </tr>
         </thead>
@@ -37,13 +35,13 @@ function SwytchcodeLog({ log }) {
           {log.map((entry, i) => (
             <tr key={i} style={{ animationDelay: `${i * 0.05}s` }}>
               <td>{formatTime(entry.timestamp)}</td>
-              <td style={{ color: 'var(--accent-cyan)' }}>{entry.tool_id}</td>
+              <td style={{ color: 'var(--accent-sky)', fontWeight: '600' }}>{entry.tool_id}</td>
               <td>
                 <span className={entry.status === 'success' ? 'log-status-success' : 'log-status-error'}>
-                  {entry.status === 'success' ? '✅' : '❌'} {entry.status_code}
+                  {entry.status === 'success' ? <CheckCircle2 size={13} /> : <XCircle size={13} />} HTTP {entry.status_code}
                 </span>
               </td>
-              <td>{entry.latency_ms}ms</td>
+              <td>{entry.latency_ms} ms</td>
             </tr>
           ))}
         </tbody>

@@ -1,15 +1,14 @@
-/**
- * TrendCard — Individual trend item with source badge.
- * Shows source type (News/Social/Emerging) with distinct colors.
- */
+import { Globe, MessageSquare, Flame } from 'lucide-react';
+
 function TrendCard({ trend, index }) {
   const sourceConfig = {
-    news: { badge: 'source-news', label: '🗞 News' },
-    social_chatter: { badge: 'source-social', label: '💬 Social' },
-    emerging_topic: { badge: 'source-emerging', label: '🔥 Emerging' },
+    news: { badge: 'source-news', label: 'News', Icon: Globe },
+    social_chatter: { badge: 'source-social', label: 'Social Chatter', Icon: MessageSquare },
+    emerging_topic: { badge: 'source-emerging', label: 'Emerging', Icon: Flame },
   };
 
   const config = sourceConfig[trend.source_type] || sourceConfig.news;
+  const SourceIcon = config.Icon;
 
   return (
     <div
@@ -19,9 +18,10 @@ function TrendCard({ trend, index }) {
     >
       <div className="trend-card-header">
         <span className={`trend-source-badge ${config.badge}`}>
+          <SourceIcon size={12} />
           {config.label}
         </span>
-        <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
           {trend.source}
         </span>
       </div>

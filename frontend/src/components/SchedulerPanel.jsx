@@ -1,7 +1,5 @@
-/**
- * SchedulerPanel — Shows scheduler status + Run Now button + countdown.
- */
 import { useState, useEffect } from 'react';
+import { Play, Loader2, Clock, Calendar, Activity } from 'lucide-react';
 
 function SchedulerPanel({ status, isRunning, onRun }) {
   const [countdown, setCountdown] = useState('');
@@ -15,7 +13,7 @@ function SchedulerPanel({ status, isRunning, onRun }) {
       const diff = next - now;
 
       if (diff <= 0) {
-        setCountdown('Imminent...');
+        setCountdown('Triggering imminent...');
         return;
       }
 
@@ -31,33 +29,29 @@ function SchedulerPanel({ status, isRunning, onRun }) {
   return (
     <div className="scheduler-info">
       <div className="scheduler-stat">
-        <span className="scheduler-stat-label">Daily Schedule</span>
+        <span className="scheduler-stat-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Calendar size={14} style={{ color: 'var(--accent-sky)' }} /> Daily Recurrence
+        </span>
         <span className="scheduler-stat-value">
           {status?.schedule_time || '09:00 UTC'}
         </span>
       </div>
 
       <div className="scheduler-stat">
-        <span className="scheduler-stat-label">Next Run</span>
-        <span className="scheduler-stat-value" style={{ color: 'var(--accent-cyan)' }}>
+        <span className="scheduler-stat-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Clock size={14} style={{ color: 'var(--accent-sky)' }} /> Next Trigger Countdown
+        </span>
+        <span className="scheduler-stat-value" style={{ color: 'var(--accent-sky)' }}>
           {countdown || 'Calculating...'}
         </span>
       </div>
 
       <div className="scheduler-stat">
-        <span className="scheduler-stat-label">Last Run</span>
-        <span className="scheduler-stat-value">
-          {status?.last_run
-            ? new Date(status.last_run).toLocaleTimeString('en-US', { hour12: false })
-            : 'Never'
-          }
+        <span className="scheduler-stat-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Activity size={14} style={{ color: 'var(--accent-secondary)' }} /> Scheduler Status
         </span>
-      </div>
-
-      <div className="scheduler-stat">
-        <span className="scheduler-stat-label">Status</span>
-        <span className="scheduler-stat-value" style={{ color: status?.running ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-          {status?.running ? '● Active' : '○ Inactive'}
+        <span className="scheduler-stat-value" style={{ color: status?.running ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+          {status?.running ? 'Active (APScheduler)' : 'Inactive'}
         </span>
       </div>
 
@@ -65,16 +59,18 @@ function SchedulerPanel({ status, isRunning, onRun }) {
         className="run-button"
         onClick={onRun}
         disabled={isRunning}
-        style={{ width: '100%', justifyContent: 'center' }}
+        style={{ width: '100%', justifyContent: 'center', marginTop: '6px' }}
         id="scheduler-run-button"
       >
         {isRunning ? (
           <>
-            <span className="spinner"></span>
-            Running Pipeline...
+            <Loader2 size={16} className="spinner-icon" style={{ animation: 'spin 1s linear infinite' }} />
+            Pipeline Executing...
           </>
         ) : (
-          <>🚀 Trigger Now</>
+          <>
+            <Play size={16} fill="currentColor" /> Trigger Daily Job Instantly
+          </>
         )}
       </button>
     </div>

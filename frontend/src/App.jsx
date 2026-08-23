@@ -1,5 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
+import {
+  Zap,
+  Radio,
+  Search,
+  FileText,
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
+  Lock
+} from 'lucide-react';
+
 import PipelineVisualizer from './components/PipelineVisualizer.jsx';
 import TrendCard from './components/TrendCard.jsx';
 import RAGInspector from './components/RAGInspector.jsx';
@@ -24,16 +35,11 @@ function App() {
   const [swytchcodeLog, setSwytchcodeLog] = useState([]);
   const [schedulerStatus, setSchedulerStatus] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [health, setHealth] = useState(null);
   const eventSourceRef = useRef(null);
 
-  // Fetch initial health and scheduler status
   useEffect(() => {
-    axios.get(`${API_BASE}/health`).then(res => setHealth(res.data)).catch(() => {});
     axios.get(`${API_BASE}/scheduler/status`).then(res => setSchedulerStatus(res.data)).catch(() => {});
     axios.get(`${API_BASE}/swytchcode/log`).then(res => setSwytchcodeLog(res.data.log || [])).catch(() => {});
-
-    // Check for existing data
     axios.get(`${API_BASE}/trends`).then(res => {
       if (res.data.trends?.length) setTrends(res.data.trends);
     }).catch(() => {});
@@ -79,8 +85,6 @@ function App() {
       }
       setIsRunning(false);
     });
-
-    es.addEventListener('heartbeat', () => {});
 
     es.onerror = () => {
       setTimeout(connectSSE, 3000);
@@ -145,21 +149,24 @@ function App() {
       {/* ── Header ────────────────────────────────────────────── */}
       <header className="header">
         <div className="header-brand">
-          <div className="header-logo">⚡</div>
+          <div className="header-logo-badge">
+            <Zap size={24} />
+          </div>
           <div>
             <h1 className="header-title">TrendPulse</h1>
-            <p className="header-subtitle">RAG-powered Trend Automation Engine</p>
+            <p className="header-subtitle">RAG-Powered Trend Automation Engine</p>
           </div>
         </div>
         <div className="header-status">
           <span className="status-dot"></span>
           <span className="status-text">
-            🔒 Swytchcode Engine Active
+            <ShieldCheck size={16} style={{ color: 'var(--accent-emerald)' }} />
+            Swytchcode Engine Active
           </span>
         </div>
       </header>
 
-      {/* ── Dashboard ─────────────────────────────────────────── */}
+      {/* ── Dashboard Grid ────────────────────────────────────── */}
       <div className="dashboard-grid">
         {/* Pipeline Visualizer — Full Width */}
         <div className="grid-pipeline">
@@ -170,15 +177,17 @@ function App() {
           />
         </div>
 
-        {/* Main Content: Trends + RAG Inspector */}
+        {/* Main Grid: Trends & RAG Inspector */}
         <div className="grid-main">
           <div className="glass-card">
             <div className="card-header">
               <h2 className="card-title">
-                <span className="icon">📡</span>
-                Live Trends
+                <span className="card-title-icon">
+                  <Radio size={18} />
+                </span>
+                Live Trends Feed
               </h2>
-              <span className="card-badge badge-cyan">{trends.length} fetched</span>
+              <span className="card-badge badge-sky">{trends.length} Fetched</span>
             </div>
             <div className="trends-grid">
               {trends.length > 0 ? (
@@ -187,8 +196,8 @@ function App() {
                 ))
               ) : (
                 <div className="empty-state">
-                  <span className="icon">📡</span>
-                  <p className="message">No trends yet. Click "Run Now" to fetch live data from NewsAPI, Reddit, HackerNews, Dev.to, and Google News RSS.</p>
+                  <Radio className="empty-state-icon" />
+                  <p className="message">No active trends. Click "Run Now" to aggregate live trends from NewsAPI, Reddit, HackerNews, Dev.to, and Google News RSS.</p>
                 </div>
               )}
             </div>
@@ -197,10 +206,12 @@ function App() {
           <div className="glass-card">
             <div className="card-header">
               <h2 className="card-title">
-                <span className="icon">🔍</span>
-                RAG Inspector
+                <span className="card-title-icon" style={{ background: 'rgba(139, 92, 246, 0.12)', color: 'var(--accent-violet)' }}>
+                  <Search size={18} />
+                </span>
+                Vector RAG Inspector
               </h2>
-              <span className="card-badge badge-purple">ChromaDB</span>
+              <span className="card-badge badge-violet">ChromaDB</span>
             </div>
             <RAGInspector passages={passages} />
           </div>
@@ -210,25 +221,31 @@ function App() {
         <div className="glass-card">
           <div className="card-header">
             <h2 className="card-title">
-              <span className="icon">📝</span>
-              Generated Post
+              <span className="card-title-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--accent-emerald)' }}>
+                <FileText size={18} />
+              </span>
+              Generated Content Preview
             </h2>
             {postResult?.success && (
-              <span className="card-badge badge-green">Posted to Reddit ✓</span>
+              <span className="card-badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <CheckCircle2 size={12} /> Posted to Reddit
+              </span>
             )}
           </div>
           <GeneratedPost content={generatedContent} postResult={postResult} />
         </div>
 
-        {/* Bottom Row: Swytchcode Log + Scheduler */}
+        {/* Bottom Row: Swytchcode Log & Scheduler */}
         <div className="grid-bottom">
           <div className="glass-card">
             <div className="card-header">
               <h2 className="card-title">
-                <span className="icon">🔒</span>
+                <span className="card-title-icon" style={{ background: 'rgba(245, 158, 11, 0.12)', color: 'var(--accent-amber)' }}>
+                  <Lock size={18} />
+                </span>
                 Swytchcode Audit Log
               </h2>
-              <span className="card-badge badge-amber">{swytchcodeLog.length} calls</span>
+              <span className="card-badge badge-amber">{swytchcodeLog.length} Executions</span>
             </div>
             <SwytchcodeLog log={swytchcodeLog} />
           </div>
@@ -236,10 +253,12 @@ function App() {
           <div className="glass-card">
             <div className="card-header">
               <h2 className="card-title">
-                <span className="icon">⏰</span>
-                Scheduler
+                <span className="card-title-icon" style={{ background: 'rgba(14, 165, 233, 0.12)', color: 'var(--accent-sky)' }}>
+                  <Clock size={18} />
+                </span>
+                Automation Scheduler
               </h2>
-              <span className="card-badge badge-green">Active</span>
+              <span className="card-badge badge-emerald">Active Schedule</span>
             </div>
             <SchedulerPanel
               status={schedulerStatus}
