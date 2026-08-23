@@ -1,6 +1,6 @@
 """
 TrendPulse — Social Poster
-Posts generated content to LinkedIn (primary) or Reddit (fallback).
+Posts generated content to LinkedIn using the v2/ugcPosts API.
 Uses Swytchcode SDK when available, falls back to direct API calls.
 """
 import time
@@ -22,8 +22,8 @@ def _log_entry(tool_id: str, status: str, code: int, latency: int, details: str 
     )
 
 
-def _post_to_linkedin(content: GeneratedContent) -> tuple:
-    """Post content to LinkedIn using the REST API."""
+def post_to_linkedin(content: GeneratedContent) -> tuple:
+    """Post content to LinkedIn using the v2/ugcPosts API."""
     tool_id = "linkedin.posts.create"
     start = time.time()
 
@@ -36,21 +36,19 @@ def _post_to_linkedin(content: GeneratedContent) -> tuple:
                     "author": settings.LINKEDIN_PERSON_URN,
                     "commentary": f"{content.title}\n\n{content.body}",
                     "visibility": "PUBLIC",
-                    "distribution": {"feedDistribution": "MAIN_FEED"},
                 }
             })
             if result and isinstance(result, dict):
                 latency = int((time.time() - start) * 1000)
-                post_url = result.get("url", "https://www.linkedin.com/feed/")
                 return PostResult(
-                    reddit_url=post_url,
+                    reddit_url=result.get("url", "https://www.linkedin.com/feed/"),
                     post_id=result.get("id", "swy"),
                     subreddit="LinkedIn",
                 ), _log_entry(tool_id, "success", 201, latency, "Posted via Swytchcode to LinkedIn")
         except Exception:
             pass
 
-    # 2. Direct LinkedIn API call
+    # 2. Direct LinkedIn API (v2/ugcPosts)
     if not settings.LINKEDIN_ACCESS_TOKEN:
         latency = int((time.time() - start) * 1000)
         return PostResult(
@@ -58,52 +56,52 @@ def _post_to_linkedin(content: GeneratedContent) -> tuple:
             post_id="pending_token",
             subreddit="LinkedIn",
             success=True,
-            error=None,
         ), _log_entry(tool_id, "success", 200, latency, "LinkedIn token pending — run get_linkedin_token.py")
 
-    # Build LinkedIn post payload
     post_text = f"{content.title}\n\n{content.body}"
     if len(post_text) > 3000:
         post_text = post_text[:2997] + "..."
 
     payload = {
         "author": settings.LINKEDIN_PERSON_URN,
-        "commentary": post_text,
-        "visibility": "PUBLIC",
-        "distribution": {
-            "feedDistribution": "MAIN_FEED",
-        },
         "lifecycleState": "PUBLISHED",
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": post_text},
+                "shareMediaCategory": "NONE",
+            }
+        },
+        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
     }
 
     headers = {
         "Authorization": f"Bearer {settings.LINKEDIN_ACCESS_TOKEN}",
         "Content-Type": "application/json",
         "X-Restli-Protocol-Version": "2.0.0",
-        "LinkedIn-Version": "202508",
     }
 
     try:
         with httpx.Client(timeout=15) as client:
             resp = client.post(
-                "https://api.linkedin.com/rest/posts",
+                "https://api.linkedin.com/v2/ugcPosts",
                 json=payload,
                 headers=headers,
             )
 
             latency = int((time.time() - start) * 1000)
 
-            if resp.status_code in (200, 201):
-                # LinkedIn returns the post ID in the x-restli-id header
-                post_id = resp.headers.get("x-restli-id", "")
-                post_url = f"https://www.linkedin.com/feed/update/{post_id}/" if post_id else "https://www.linkedin.com/feed/"
+            if resp.status_code == 201:
+                post_data = resp.json()
+                share_id = post_data.get("id", "")
+                # Build the LinkedIn post URL
+                post_url = f"https://www.linkedin.com/feed/update/{share_id}/" if share_id else "https://www.linkedin.com/feed/"
 
                 return PostResult(
                     reddit_url=post_url,
-                    post_id=post_id,
+                    post_id=share_id,
                     subreddit="LinkedIn",
                     success=True,
-                ), _log_entry(tool_id, "success", resp.status_code, latency, f"Posted to LinkedIn (ID: {post_id[:20]})")
+                ), _log_entry(tool_id, "success", 201, latency, f"Posted to LinkedIn ({share_id[:40]})")
 
             else:
                 error_msg = resp.text[:200]
@@ -126,6 +124,5 @@ def _post_to_linkedin(content: GeneratedContent) -> tuple:
         ), _log_entry(tool_id, "error", 500, latency, str(e)[:200])
 
 
-def post_to_reddit(content: GeneratedContent) -> tuple:
-    """Primary posting function — routes to LinkedIn."""
-    return _post_to_linkedin(content)
+# Backward-compatible alias
+post_to_reddit = post_to_linkedin

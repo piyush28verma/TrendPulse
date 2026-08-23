@@ -6,16 +6,17 @@ import {
   Share2,
   CheckCircle2,
   Play,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 
 function PipelineVisualizer({ steps, isRunning, onRun }) {
   const pipelineConfig = [
-    { key: 'fetch',    Icon: Radio,   label: 'Fetch Trends',     sub: 'Swytchcode' },
-    { key: 'ingest',   Icon: Layers,  label: 'Chunk & Embed',    sub: 'ChromaDB' },
-    { key: 'retrieve', Icon: Search,  label: 'Vector Retrieve',  sub: 'Top-5 RAG' },
-    { key: 'generate', Icon: Cpu,     label: 'Groq Generate',    sub: 'Groq AI' },
-    { key: 'post',     Icon: Share2,  label: 'Post to LinkedIn',   sub: 'Swytchcode' },
+    { key: 'fetch',    Icon: Radio,   label: 'Fetch Trends',          sub: 'Swytchcode' },
+    { key: 'ingest',   Icon: Layers,  label: 'Chunk & Embed',         sub: 'ChromaDB' },
+    { key: 'retrieve', Icon: Search,  label: 'Vector Retrieve',       sub: 'Top-5 RAG' },
+    { key: 'generate', Icon: Cpu,     label: 'Groq AI Generate',      sub: 'Multi-Model' },
+    { key: 'post',     Icon: Share2,  label: 'Post Across Platforms', sub: 'Multi-Channel Engine' },
   ];
 
   const getStepStatus = (key) => steps[key] || 'waiting';
@@ -26,14 +27,20 @@ function PipelineVisualizer({ steps, isRunning, onRun }) {
   };
 
   return (
-    <div className="glass-card">
+    <div className="glass-card pipeline-card">
       <div className="card-header">
-        <h2 className="card-title">
-          <span className="card-title-icon">
-            <Cpu size={18} />
+        <div className="card-title-group">
+          <h2 className="card-title">
+            <span className="card-title-icon">
+              <Cpu size={18} />
+            </span>
+            RAG Pipeline Execution
+          </h2>
+          <span className="floating-pill">
+            <Sparkles size={12} style={{ color: 'var(--accent-indigo)' }} />
+            Automated Synthesis
           </span>
-          RAG Pipeline Execution
-        </h2>
+        </div>
         <button
           className="run-button"
           onClick={onRun}
@@ -43,7 +50,7 @@ function PipelineVisualizer({ steps, isRunning, onRun }) {
           {isRunning ? (
             <>
               <Loader2 size={16} className="spinner-icon" style={{ animation: 'spin 1s linear infinite' }} />
-              Processing Pipeline...
+              Processing Engine...
             </>
           ) : (
             <>

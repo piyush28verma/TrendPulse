@@ -8,7 +8,12 @@ import {
   ShieldCheck,
   Clock,
   CheckCircle2,
-  Lock
+  Lock,
+  Layers,
+  Sparkles,
+  Share2,
+  Sliders,
+  Cpu
 } from 'lucide-react';
 
 import PipelineVisualizer from './components/PipelineVisualizer.jsx';
@@ -154,15 +159,22 @@ function App() {
           </div>
           <div>
             <h1 className="header-title">TrendPulse</h1>
-            <p className="header-subtitle">RAG-Powered Trend Automation Engine</p>
+            <p className="header-subtitle">Autonomous RAG & Multi-Format Content Repurposing Engine</p>
           </div>
         </div>
-        <div className="header-status">
-          <span className="status-dot"></span>
-          <span className="status-text">
-            <ShieldCheck size={16} style={{ color: 'var(--accent-emerald)' }} />
-            Swytchcode Engine Active
-          </span>
+
+        <div className="header-status-group">
+          <div className="floating-stat-badge">
+            <Layers size={13} style={{ color: 'var(--accent-indigo)' }} />
+            <span>5 Cross-Platform Formats</span>
+          </div>
+          <div className="header-status">
+            <span className="status-dot"></span>
+            <span className="status-text">
+              <ShieldCheck size={16} style={{ color: 'var(--accent-emerald)' }} />
+              Swytchcode Policy Engine Active
+            </span>
+          </div>
         </div>
       </header>
 
@@ -185,9 +197,9 @@ function App() {
                 <span className="card-title-icon">
                   <Radio size={18} />
                 </span>
-                Live Trends Feed
+                Live Multi-Source Trends
               </h2>
-              <span className="card-badge badge-sky">{trends.length} Fetched</span>
+              <span className="card-badge badge-sky">{trends.length} Aggregated</span>
             </div>
             <div className="trends-grid">
               {trends.length > 0 ? (
@@ -197,7 +209,7 @@ function App() {
               ) : (
                 <div className="empty-state">
                   <Radio className="empty-state-icon" />
-                  <p className="message">No active trends. Click "Run Now" to aggregate live trends from NewsAPI, Reddit, HackerNews, Dev.to, and Google News RSS.</p>
+                  <p className="message">No active trends loaded. Click "Run Pipeline Now" to stream real-time trends from HackerNews, Dev.to, Google News RSS, and Reddit.</p>
                 </div>
               )}
             </div>
@@ -211,31 +223,34 @@ function App() {
                 </span>
                 Vector RAG Inspector
               </h2>
-              <span className="card-badge badge-violet">ChromaDB</span>
+              <span className="card-badge badge-violet">ChromaDB Top-5</span>
             </div>
             <RAGInspector passages={passages} />
           </div>
         </div>
 
-        {/* Generated Post — Full Width */}
-        <div className="glass-card">
+        {/* Content Engine (Multi-Format Repurposing) — Full Width */}
+        <div className="glass-card repurpose-section-card">
           <div className="card-header">
-            <h2 className="card-title">
-              <span className="card-title-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--accent-emerald)' }}>
-                <FileText size={18} />
-              </span>
-              Generated Content Preview
-            </h2>
+            <div>
+              <h2 className="card-title">
+                <span className="card-title-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--accent-emerald)' }}>
+                  <FileText size={18} />
+                </span>
+                Multi-Format Content Repurposing Engine
+              </h2>
+              <p className="section-subtext">Takes 1 core vector insight and adapts it into authentic, on-brand formats</p>
+            </div>
             {postResult?.success && (
-              <span className="card-badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <CheckCircle2 size={12} /> Posted to LinkedIn
+              <span className="card-badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <CheckCircle2 size={13} /> Published on LinkedIn
               </span>
             )}
           </div>
           <GeneratedPost content={generatedContent} postResult={postResult} />
         </div>
 
-        {/* Bottom Row: Swytchcode Log & Scheduler */}
+        {/* Bottom Row: Swytchcode Audit Log & Scheduler */}
         <div className="grid-bottom">
           <div className="glass-card">
             <div className="card-header">
@@ -243,7 +258,7 @@ function App() {
                 <span className="card-title-icon" style={{ background: 'rgba(245, 158, 11, 0.12)', color: 'var(--accent-amber)' }}>
                   <Lock size={18} />
                 </span>
-                Swytchcode Audit Log
+                Swytchcode Audit & Policy Log
               </h2>
               <span className="card-badge badge-amber">{swytchcodeLog.length} Executions</span>
             </div>
@@ -256,9 +271,9 @@ function App() {
                 <span className="card-title-icon" style={{ background: 'rgba(14, 165, 233, 0.12)', color: 'var(--accent-sky)' }}>
                   <Clock size={18} />
                 </span>
-                Automation Scheduler
+                Automation & Daily Scheduler
               </h2>
-              <span className="card-badge badge-emerald">Active Schedule</span>
+              <span className="card-badge badge-emerald">APScheduler Active</span>
             </div>
             <SchedulerPanel
               status={schedulerStatus}

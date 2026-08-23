@@ -17,7 +17,7 @@ from backend.config import settings
 from backend.models import PipelineResult, SwytchcodeLogEntry
 from backend.trend_fetcher import fetch_all_trends
 from backend.rag_engine import run_rag_pipeline
-from backend.poster import post_to_reddit
+from backend.poster import post_to_linkedin
 from backend.scheduler import start_scheduler, get_scheduler_status, set_pipeline_callback, shutdown_scheduler
 
 
@@ -110,11 +110,11 @@ async def _run_pipeline_async():
 
         result.generated_content = content
 
-        # ── Step 5: Post to Reddit ───────────────────────────────────────
+        # ── Step 5: Post to LinkedIn ───────────────────────────────────────
         _broadcast_sse("pipeline_step", {"step": "post", "status": "running"})
         await asyncio.sleep(0.1)
 
-        post_result, post_log = await asyncio.to_thread(post_to_reddit, content)
+        post_result, post_log = await asyncio.to_thread(post_to_linkedin, content)
         result.post_result = post_result
         result.swytchcode_log.append(post_log)
         swytchcode_audit_log.append(post_log.to_dict())

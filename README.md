@@ -1,27 +1,25 @@
-# ⚡ TrendPulse (vibewright)
+# TrendPulse
 
-> **RAG-Based Trend Automation Engine powered by Swytchcode**
-
-TrendPulse is an automated content generation and publishing pipeline built for Hackathons. It retrieves real-time trending topics across **5 news and social chatter APIs**, indexes them into an in-memory **ChromaDB vector store**, retrieves relevant passages using cosine similarity vector search, generates grounded content with source citations using **Groq LLM (Llama 3.3 70B)**, and automatically posts to social channels via **Swytchcode**.
+TrendPulse is an automated content generation and publishing pipeline. It retrieves real-time trending topics across **5 news and social chatter APIs**, indexes them into an in-memory **ChromaDB vector store**, retrieves relevant passages using cosine similarity vector search, generates grounded content with source citations using **Groq LLM (Llama 3.3 70B)**, and automatically posts to social channels via **Swytchcode**.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-- **📡 Multi-Source Trend Aggregation**: NewsAPI, Reddit (`r/technology`, `r/worldnews`, `r/programming`, `r/artificial`), HackerNews, Dev.to, and Google News RSS.
-- **🔒 Swytchcode Policy Execution Layer**: All outbound fetches and social posting pass through Swytchcode's `tooling.json` policy engine with real-time audit logging.
-- **🧠 Vector RAG Grounding**: Powered by ChromaDB & `sentence-transformers/all-MiniLM-L6-v2` to prevent hallucinations and provide exact citation tracing `[1], [2]`.
-- **🚀 Fast LLM Generation**: High-throughput inference via Groq (`llama-3.3-70b-versatile`).
-- **⏰ Daily Scheduler + Instant Trigger**: Automated cron scheduler (09:00 UTC) with a live **"Run Now"** trigger for instant demo execution.
-- **📊 Dark Glassmorphism Dashboard**: React + Vite UI featuring real-time Server-Sent Events (SSE) pipeline step visualizer, RAG vector inspector with similarity score bars, and Swytchcode audit table.
+- **Multi-Source Trend Aggregation**: NewsAPI, Reddit (`r/technology`, `r/worldnews`, `r/programming`, `r/artificial`), HackerNews, Dev.to, and Google News RSS.
+- **Swytchcode Policy Execution Layer**: All outbound fetches and social posting pass through Swytchcode's `tooling.json` policy engine with real-time audit logging.
+- **Vector RAG Grounding**: Powered by ChromaDB & `sentence-transformers/all-MiniLM-L6-v2` to prevent hallucinations and provide exact citation tracing `[1], [2]`.
+- **Fast LLM Generation**: High-throughput inference via Groq (`llama-3.3-70b-versatile`).
+- **Daily Scheduler + Instant Trigger**: Automated cron scheduler (09:00 UTC) with a live **"Run Now"** trigger for instant demo execution.
+- **Dark Glassmorphism Dashboard**: React + Vite UI featuring real-time Server-Sent Events (SSE) pipeline step visualizer, RAG vector inspector with similarity score bars, and Swytchcode audit table.
 
 ---
 
-## 🛠️ Architecture Overview
+## Architecture Overview
 
 ```mermaid
 graph TD
-    subgraph "📡 Multi-Source Trends"
+    subgraph "Multi-Source Trends"
         NA["NewsAPI.org"]
         RD["Reddit r/technology, r/worldnews"]
         HN["HackerNews"]
@@ -29,13 +27,13 @@ graph TD
         GN["Google News RSS"]
     end
 
-    subgraph "🔒 Swytchcode Execution Layer"
+    subgraph "Swytchcode Execution Layer"
         SC["Swytchcode SDK / tooling.json"]
         SC --> NA & RD & HN & DEV & GN
-        SC -->|reddit.submit_post.post| REDDIT["Reddit Target Subreddit"]
+        SC -->|linkedin.posts.create| LI["LinkedIn Feed"]
     end
 
-    subgraph "🧠 Vector RAG Pipeline"
+    subgraph "Vector RAG Pipeline"
         F["Trend Fetcher"] --> CH["Chunker & Metadata Tagger"]
         CH --> VE["SentenceTransformer Embedder"]
         VE --> DB["ChromaDB Vector Store"]
@@ -51,7 +49,7 @@ graph TD
 
 ---
 
-## 🚀 Quick Start Guide
+## Quick Start Guide
 
 ### 1. Prerequisites
 - Python 3.10+
@@ -61,8 +59,8 @@ graph TD
 ### 2. Environment Setup
 Clone the repository and create `.env`:
 ```bash
-git clone https://github.com/piyush28verma/vibewright.git
-cd vibewright
+git clone https://github.com/piyush28verma/TrendPulse.git
+cd TrendPulse
 cp .env.example .env
 ```
 
@@ -70,10 +68,15 @@ Fill in your API keys in `.env`:
 ```env
 NEWSAPI_KEY=your_newsapi_key
 GROQ_API_KEY=your_groq_api_key
-REDDIT_CLIENT_ID=your_client_id
-REDDIT_CLIENT_SECRET=your_client_secret
-REDDIT_USERNAME=your_username
-REDDIT_PASSWORD=your_password
+LINKEDIN_CLIENT_ID=your_linkedin_client_id
+LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
+LINKEDIN_ACCESS_TOKEN=your_linkedin_access_token
+LINKEDIN_PERSON_URN=urn:li:person:your_person_urn
+```
+
+Generate your LinkedIn access token automatically:
+```bash
+python3 get_linkedin_token.py
 ```
 
 ### 3. Install Dependencies
@@ -104,7 +107,7 @@ npm run dev
 
 ---
 
-## 🛡️ Swytchcode Policy Configuration (`tooling.json`)
+## Swytchcode Policy Configuration (`tooling.json`)
 
 ```json
 {
@@ -122,6 +125,6 @@ npm run dev
 
 ---
 
-## 📜 License
+## License
 
 MIT License
