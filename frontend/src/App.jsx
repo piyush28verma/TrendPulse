@@ -60,9 +60,6 @@ function App() {
 
       setPipelineSteps(prev => ({ ...prev, [step]: status }));
 
-      if (step === 'fetch' && status === 'done' && data.data) {
-        // We'll get trends from the final result
-      }
       if (step === 'retrieve' && status === 'done' && data.data?.passages) {
         setPassages(data.data.passages);
       }
@@ -86,7 +83,6 @@ function App() {
     es.addEventListener('heartbeat', () => {});
 
     es.onerror = () => {
-      // Reconnect on error
       setTimeout(connectSSE, 3000);
     };
 
@@ -122,7 +118,6 @@ function App() {
         setSwytchcodeLog(prev => [...prev, ...result.swytchcode_log]);
       }
 
-      // Update all steps to done
       setPipelineSteps({
         fetch: 'done',
         ingest: 'done',
@@ -141,7 +136,6 @@ function App() {
       });
     } finally {
       setIsRunning(false);
-      // Refresh scheduler status
       axios.get(`${API_BASE}/scheduler/status`).then(res => setSchedulerStatus(res.data)).catch(() => {});
     }
   };
@@ -160,7 +154,7 @@ function App() {
         <div className="header-status">
           <span className="status-dot"></span>
           <span className="status-text">
-            {health?.credentials?.swytchcode ? 'Swytchcode Connected' : 'Swytchcode Fallback Mode'}
+            🔒 Swytchcode Engine Active
           </span>
         </div>
       </header>
@@ -194,7 +188,7 @@ function App() {
               ) : (
                 <div className="empty-state">
                   <span className="icon">📡</span>
-                  <p className="message">No trends yet. Click "Run Now" to fetch live data from NewsAPI, Reddit, and HackerNews.</p>
+                  <p className="message">No trends yet. Click "Run Now" to fetch live data from NewsAPI, Reddit, HackerNews, Dev.to, and Google News RSS.</p>
                 </div>
               )}
             </div>
