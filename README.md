@@ -1,6 +1,8 @@
 # TrendPulse
 
-TrendPulse is an automated content generation and publishing pipeline. It retrieves real-time trending topics across **5 news and social chatter APIs**, indexes them into an in-memory **ChromaDB vector store**, retrieves relevant passages using cosine similarity vector search, generates grounded content with source citations using **Groq LLM (Llama 3.3 70B)**, and automatically posts to social channels via **Swytchcode**.
+> **An Autonomous Agentic & Generative AI (Agentic RAG) Engine for Real-Time Trend Intelligence, Semantic Grounding, and Policy-Governed Action Execution.**
+
+TrendPulse is a closed-loop **Agentic AI and Generative AI (GenAI)** system engineered for autonomous environmental sensing, dense vector retrieval, hallucination-mitigated synthesis, and policy-gated tool execution. Moving beyond passive single-turn LLM generation, TrendPulse operates as a fully autonomous agent: it continuously ingests high-velocity unstructured data streams across **5 live news and social intelligence APIs**, indexes dynamic temporal context into an in-memory **ChromaDB vector store** using **Sentence Transformers**, executes cosine-similarity **Retrieval-Augmented Generation (RAG)** to mathematically ground context, synthesizes evidence-backed insights with formal citation tracing via **Groq-accelerated Llama 3.3 70B**, and safely commits external real-world actions (automated LinkedIn publishing) via a sandboxed **Swytchcode policy execution layer** with live Server-Sent Events (SSE) telemetry.
 
 ---
 
